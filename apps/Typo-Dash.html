@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typo-Dash · Alpha-Block</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════
+           DESIGN TOKENS
+           ═══════════════════════════════════════ */
+        :root {
+            --bg: #0d0015;
+            --ground: #b026ff;
+            --cube: #ff2d7b;
+            --cube-glow: #ff6faa;
+            --spike: #e040fb;
+            --accent: #00e5ff;
+            --success: #0aff9d;
+            --fail: #ff003c;
+            --combo: #ffe600;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ═══ GAME AREA ═══ */
+        #game-wrap {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
+
+        canvas#game {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .pill {
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px 16px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .pill .v {
+            font-weight: 800;
+            font-size: 20px;
+        }
+
+        #progress-wrap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 6;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--cube), var(--accent));
+            transition: width .3s linear;
+        }
+
+        #combo-pop {
+            position: absolute;
+            top: 28%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1);
+            font-size: 52px;
+            font-weight: 800;
+            color: var(--combo);
+            text-shadow: 0 0 30px var(--combo);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity .15s, transform .3s;
+        }
+
+        /* ═══ OVERLAYS ═══ */
+        .ov {
+            position: absolute;
+            inset: 0;
+            background: rgba(13, 0, 21, 0.92);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            gap: 14px;
+        }
+
+        .ov h1 {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--cube), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .ov .sub {
+            color: #aaa;
+            font-size: 14px;
+            max-width: 360px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .btn {
+            margin-top: 10px;
+            background: linear-gradient(135deg, var(--cube), #b026ff);
+            color: #fff;
+            border: none;
+            padding: 14px 48px;
+            font-size: 18px;
+            font-family: inherit;
+            font-weight: 600;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+            box-shadow: 0 4px 20px rgba(255, 45, 123, 0.4);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 30px rgba(255, 45, 123, 0.6);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ═══ DASHBOARD ═══ */
+        #dashboard {
+            height: 220px;
+            background: #0a0014;
+            border-top: 2px solid rgba(176, 38, 255, 0.4);
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            padding: 14px 20px;
+            gap: 14px;
+            z-index: 30;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .panel h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #777;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .kb-row {
+            display: flex;
+            justify-content: center;
+            gap: 3px;
+            margin-bottom: 3px;
+        }
+
+        .kb-key {
+            width: 28px;
+            height: 28px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #555;
+            transition: all .08s;
+            font-family: inherit;
+        }
+
+        .kb-key.target {
+            border-color: var(--success);
+            color: var(--success);
+            box-shadow: 0 0 6px var(--success);
+        }
+
+        .kb-key.hit {
+            background: var(--combo);
+            color: #000;
+        }
+
+        .kb-key.miss {
+            background: var(--fail);
+            color: #fff;
+        }
+
+        .kb-key.heat-1 {
+            background: rgba(255, 0, 60, 0.15);
+            color: #f88;
+        }
+
+        .kb-key.heat-2 {
+            background: rgba(255, 0, 60, 0.35);
+            color: #f66;
+        }
+
+        .kb-key.heat-3 {
+            background: rgba(255, 0, 60, 0.6);
+            color: #fff;
+        }
+
+        #apm-graph {
+            width: 100%;
+            height: 130px;
+        }
+
+        .sr {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .sr .l {
+            color: #888;
+        }
+
+        .sr .v {
+            font-weight: 600;
+        }
+
+        /* Phase Switcher */
+        #phase-switcher {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 8;
+        }
+
+        .phase-btn {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #888;
+            padding: 5px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .phase-btn:hover {
+            border-color: rgba(255, 255, 255, 0.35);
+            color: #ccc;
+        }
+
+        .phase-btn.active {
+            background: rgba(176, 38, 255, 0.3);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-wrap">
+        <canvas id="game"></canvas>
+        <div id="progress-wrap">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="hud">
+            <div class="pill"><span class="l">SCORE</span><span class="v" id="h-score">0</span></div>
+            <div class="pill"><span class="l">COMBO</span><span class="v" id="h-combo">0</span></div>
+            <div class="pill"><span class="l">TIME</span><span class="v" id="h-time">90</span></div>
+        </div>
+        <div id="combo-pop"></div>
+
+        <div id="phase-switcher">
+            <button class="phase-btn active" data-phase="0" onclick="switchPhase(0)">① Einzeln</button>
+            <button class="phase-btn" data-phase="1" onclick="switchPhase(1)">② Paare</button>
+            <button class="phase-btn" data-phase="2" onclick="switchPhase(2)">③ Wörter</button>
+        </div>
+
+        <div class="ov" id="ov-start">
+            <h1>Typo-Dash</h1>
+            <p class="sub">Level 1 · Alpha-Block<br>Lerne die Grundreihe: A S D F J K L Ö</p>
+            <button class="btn" id="btn-start">▶ Start</button>
+            <p style="font-size:11px;color:#555;margin-top:6px;">🎧 Kopfhörer empfohlen</p>
+        </div>
+
+        <div class="ov hidden" id="ov-end">
+            <h1 id="end-title">Level Complete</h1>
+            <div class="pill" style="font-size:16px;gap:10px;"><span>Score</span><span class="v" id="end-score">0</span>
+            </div>
+            <button class="btn" id="btn-again">↻ Nochmal</button>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <div class="panel">
+            <h3>Live-Input / Heatmap</h3>
+            <div id="kb"></div>
+        </div>
+        <div class="panel">
+            <h3>APM-Verlauf</h3>
+            <canvas id="apm-graph"></canvas>
+        </div>
+        <div class="panel">
+            <h3>Statistiken</h3>
+            <div class="sr"><span class="l">Genauigkeit</span><span class="v" id="st-acc">–</span></div>
+            <div class="sr"><span class="l">Fehler</span><span class="v" style="color:var(--fail)" id="st-miss">0</span>
+            </div>
+            <div class="sr"><span class="l">Max Combo</span><span class="v" style="color:var(--combo)"
+                    id="st-combo">0</span></div>
+            <div class="sr"><span class="l">Ø APM</span><span class="v" style="color:var(--accent)" id="st-apm">–</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ════════════════════════════════════════════════════
+           TYPO-DASH  ·  Alpha-Block Engine v4
+           Geometry-Dash-Style Physics + Beat-Snapped Generation
+           ════════════════════════════════════════════════════ */
+
+        // ─── CONFIG ─────────────────────────────────────────
+        const CFG = {
+            BPM: 100,
+            get BEAT_SEC() { return 60 / this.BPM; },          // 0.6 s
+            SCROLL_PX_S: 360,                                 // pixels per second
+            get BEAT_PX() { return this.SCROLL_PX_S * this.BEAT_SEC; }, // 216 px per beat
+            TOTAL_TIME: 90,
+            CUBE_X_RATIO: 0.22,                                // cube at 22 % of width
+            GROUND_RATIO: 0.75,                                // ground at 75 %
+            GRAVITY: 2800,                                 // px/s²
+            JUMP_VEL: -700,                                 // px/s upward impulse
+            CUBE_SIZE: 42,
+            SPIKE_W: 36,
+            SPIKE_H: 42,
+            HITBOX_SHRINK: 6,                                    // px inset for forgiving hitbox
+            DEATH_PARTICLES: 35,
+            LOOKAHEAD_BEATS: 6,
+        };
+
+        // ─── HAND BUCKETS ───────────────────────────────────
+        const LEFT = ['A', 'S', 'D', 'F'];
+        const RIGHT = ['J', 'K', 'L', 'Ö'];
+        const ALL = [...LEFT, ...RIGHT];
+
+        const MIRROR = { A: 'Ö', S: 'L', D: 'K', F: 'J', J: 'F', K: 'D', L: 'S', Ö: 'A' };
+
+        // Pattern Generators
+        const Bucket = {
+            /** Alternator: left-right ping pong */
+            alternator(prev) {
+                const wasLeft = LEFT.includes(prev);
+                const pool = wasLeft ? RIGHT : LEFT;
+                return pool[Math.floor(Math.random() * pool.length)];
+            },
+            /** Roll: sequential neighbor */
+            roll(prev) {
+                const idx = ALL.indexOf(prev);
+                if (idx < 0) return ALL[0];
+                const dir = Math.random() < 0.5 ? 1 : -1;
+                const next = Math.max(0, Math.min(ALL.length - 1, idx + dir));
+                return ALL[next];
+            },
+            /** Mirror: same finger opposite hand */
+            mirror(prev) {
+                return MIRROR[prev] || this.alternator(prev);
+            }
+        };
+
+        // ─── AUDIO ENGINE ───────────────────────────────────
+        class SFX {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.master = this.ctx.createGain();
+                this.master.gain.value = 0.32;
+                this.master.connect(this.ctx.destination);
+                this.nextBeat = 0;
+                this.beatNum = 0;
+                this._noiseCache = null;
+            }
+            resume() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
+
+            _noise(dur) {
+                const len = this.ctx.sampleRate * dur;
+                const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+                return buf;
+            }
+
+            kick(t) {
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'sine'; o.connect(g); g.connect(this.master);
+                o.frequency.setValueAtTime(160, t);
+                o.frequency.exponentialRampToValueAtTime(30, t + 0.25);
+                g.gain.setValueAtTime(0.9, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                o.start(t); o.stop(t + 0.4);
+            }
+            hat(t) {
+                const s = this.ctx.createBufferSource();
+                s.buffer = this._noise(0.05);
+                const f = this.ctx.createBiquadFilter();
+                f.type = 'highpass'; f.frequency.value = 7000;
+                const g = this.ctx.createGain();
+                s.connect(f); f.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.35, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                s.start(t);
+            }
+            snare(t) {
+                const s = this.ctx.createBufferSource();
+                s.buffer = this._noise(0.1);
+                const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3000;
+                const g = this.ctx.createGain();
+                s.connect(bp); bp.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.4, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                s.start(t);
+                const o = this.ctx.createOscillator(), g2 = this.ctx.createGain();
+                o.type = 'triangle'; o.frequency.value = 180;
+                o.connect(g2); g2.connect(this.master);
+                g2.gain.setValueAtTime(0.3, t);
+                g2.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+                o.start(t); o.stop(t + 0.1);
+            }
+            bass(t, freq) {
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'square'; o.frequency.value = freq;
+                o.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.12, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + CFG.BEAT_SEC * 0.7);
+                o.start(t); o.stop(t + CFG.BEAT_SEC);
+            }
+
+            scheduleBeat() {
+                const now = this.ctx.currentTime;
+                while (this.nextBeat < now + 0.12) {
+                    const b = this.beatNum % 8;
+                    if (b % 2 === 0) this.kick(this.nextBeat);
+                    this.hat(this.nextBeat);
+                    if (b === 2 || b === 6) this.snare(this.nextBeat);
+                    const bassNotes = [55, 55, 73.4, 65.4];
+                    this.bass(this.nextBeat, bassNotes[b % 4]);
+                    this.beatNum++;
+                    this.nextBeat += CFG.BEAT_SEC;
+                }
+            }
+            resetBeat() { this.nextBeat = this.ctx.currentTime + 0.05; this.beatNum = 0; }
+
+            click() {
+                this.resume();
+                const t = this.ctx.currentTime;
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'square'; o.frequency.value = 900;
+                o.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.08, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+                o.start(t); o.stop(t + 0.04);
+            }
+            ping(combo) {
+                const t = this.ctx.currentTime;
+                const freq = 523 * Math.pow(1.0595, combo % 12);
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'sine'; o.frequency.value = freq;
+                o.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.18, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                o.start(t); o.stop(t + 0.4);
+                // harmonic
+                const o2 = this.ctx.createOscillator(), g2 = this.ctx.createGain();
+                o2.type = 'sine'; o2.frequency.value = freq * 2;
+                o2.connect(g2); g2.connect(this.master);
+                g2.gain.setValueAtTime(0.05, t);
+                g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                o2.start(t); o2.stop(t + 0.3);
+            }
+            error() {
+                const t = this.ctx.currentTime;
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(120, t);
+                o.frequency.linearRampToValueAtTime(40, t + 0.25);
+                o.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.25, t);
+                g.gain.linearRampToValueAtTime(0.001, t + 0.25);
+                o.start(t); o.stop(t + 0.3);
+            }
+            crash() {
+                const t = this.ctx.currentTime;
+                // deep boom
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'sine'; o.frequency.setValueAtTime(80, t);
+                o.frequency.exponentialRampToValueAtTime(20, t + 0.6);
+                o.connect(g); g.connect(this.master);
+                g.gain.setValueAtTime(0.7, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                o.start(t); o.stop(t + 0.6);
+                // noise burst
+                const s = this.ctx.createBufferSource();
+                s.buffer = this._noise(0.3);
+                const g2 = this.ctx.createGain();
+                s.connect(g2); g2.connect(this.master);
+                g2.gain.setValueAtTime(0.5, t);
+                g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                s.start(t);
+                // Duck master momentarily
+                this.master.gain.setValueAtTime(0.1, t);
+                this.master.gain.linearRampToValueAtTime(0.32, t + 0.8);
+            }
+        }
+
+        // ─── CANVAS RENDERER ────────────────────────────────
+        class Renderer {
+            constructor(id) {
+                this.c = document.getElementById(id);
+                this.x = this.c.getContext('2d');
+                this.fit();
+                window.addEventListener('resize', () => this.fit());
+                // Stars (static)
+                this.stars = Array.from({ length: 90 }, () => ({
+                    x: Math.random(), y: Math.random() * 0.72,
+                    s: Math.random() * 1.5 + 0.5, phase: Math.random() * 6.28
+                }));
+                this.particles = [];
+                this.shake = 0;
+                this.hue = 270;
+                this.groundScroll = 0;
+            }
+
+            fit() {
+                const p = this.c.parentElement;
+                this.c.width = p.clientWidth;
+                this.c.height = p.clientHeight;
+                this.W = this.c.width;
+                this.H = this.c.height;
+                this.groundY = Math.floor(this.H * CFG.GROUND_RATIO);
+                this.cubeX = Math.floor(this.W * CFG.CUBE_X_RATIO);
+            }
+
+            burst(x, y, col, n = CFG.DEATH_PARTICLES) {
+                for (let i = 0; i < n; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const sp = Math.random() * 400 + 100;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(a) * sp,
+                        vy: Math.sin(a) * sp - 200,
+                        life: 1,
+                        col,
+                        size: Math.random() * 6 + 2
+                    });
+                }
+            }
+
+            updateParticles(dt) {
+                this.particles.forEach(p => {
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vy += 1200 * dt; // particle gravity
+                    p.life -= 1.5 * dt;
+                });
+                this.particles = this.particles.filter(p => p.life > 0);
+                if (this.shake > 0) { this.shake *= 0.88; if (this.shake < 0.3) this.shake = 0; }
+            }
+
+            draw(G, elapsed) {
+                const { x: ctx, W, H, groundY, cubeX } = this;
+                this.hue = 270 + Math.sin(elapsed * 0.05) * 25;
+                const hue = this.hue;
+
+                // ── Sky ──
+                const sky = ctx.createLinearGradient(0, 0, 0, H);
+                sky.addColorStop(0, `hsl(${hue - 20},80%,4%)`);
+                sky.addColorStop(0.65, `hsl(${hue},60%,7%)`);
+                sky.addColorStop(1, `hsl(${hue + 15},50%,10%)`);
+                ctx.fillStyle = sky;
+                ctx.fillRect(0, 0, W, H);
+
+                // ── Stars ──
+                this.stars.forEach(s => {
+                    s.phase += 0.008;
+                    ctx.fillStyle = `rgba(255,255,255,${0.25 + Math.sin(s.phase) * 0.25})`;
+                    ctx.fillRect(s.x * W, s.y * H, s.s, s.s);
+                });
+
+                ctx.save();
+                if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+
+                // ── Ground ──
+                const grd = ctx.createLinearGradient(0, groundY, 0, H);
+                grd.addColorStop(0, `hsl(${hue + 40},90%,55%)`);
+                grd.addColorStop(1, `hsl(${hue + 60},85%,35%)`);
+                ctx.fillStyle = grd;
+                ctx.fillRect(0, groundY, W, H - groundY);
+
+                // Ground glow
+                ctx.strokeStyle = `hsl(${hue + 40},100%,75%)`;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 14;
+                ctx.shadowColor = `hsl(${hue + 40},100%,65%)`;
+                ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Ground grid (scrolling)
+                this.groundScroll = (this.groundScroll + CFG.SCROLL_PX_S * (1 / 60)) % 60;
+                ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+                ctx.lineWidth = 1;
+                for (let i = -1; i < Math.ceil(W / 60) + 2; i++) {
+                    const lx = i * 60 - this.groundScroll;
+                    ctx.beginPath(); ctx.moveTo(lx, groundY); ctx.lineTo(lx, H); ctx.stroke();
+                }
+
+                // ── Obstacles (Spikes) ──
+                if (G.obstacles) {
+                    G.obstacles.forEach(ob => {
+                        if (ob.worldX - G.cameraX + CFG.SPIKE_W < -50 || ob.worldX - G.cameraX > W + 100) return;
+                        const sx = ob.worldX - G.cameraX;
+                        const sy = groundY;
+
+                        // Spike triangle
+                        ctx.fillStyle = ob.cleared
+                            ? `hsla(${hue + 50},90%,55%,0.25)`
+                            : `hsl(${hue + 50},90%,55%)`;
+                        ctx.beginPath();
+                        ctx.moveTo(sx, sy);
+                        ctx.lineTo(sx + CFG.SPIKE_W / 2, sy - CFG.SPIKE_H);
+                        ctx.lineTo(sx + CFG.SPIKE_W, sy);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        if (!ob.cleared) {
+                            // Glow
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = `hsl(${hue + 50},100%,60%)`;
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                        }
+
+                        // Letter label floating above spike
+                        if (!ob.cleared && ob.letter) {
+                            const labelX = sx + CFG.SPIKE_W / 2;
+                            const labelY = sy - CFG.SPIKE_H - 20;
+                            ctx.font = "bold 20px 'Outfit'";
+                            ctx.textAlign = 'center';
+                            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                            ctx.fillText(ob.letter, labelX, labelY);
+
+                            // ── Lookahead line: connect cube text to spike ──
+                            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([4, 6]);
+                            ctx.beginPath();
+                            ctx.moveTo(cubeX + CFG.CUBE_SIZE / 2, groundY - CFG.CUBE_SIZE - 30);
+                            ctx.lineTo(labelX, labelY + 8);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        }
+                    });
+                }
+
+                // ── Cube Avatar ──
+                if (!G.dead) {
+                    const cs = CFG.CUBE_SIZE;
+                    const cy = groundY - cs - G.cubeY;
+
+                    // Trail
+                    if (G.trail) {
+                        G.trail.forEach((t, i) => {
+                            const a = (i / G.trail.length) * 0.25;
+                            ctx.fillStyle = `rgba(255,45,123,${a})`;
+                            ctx.fillRect(t.x, t.y, cs * 0.75, cs * 0.75);
+                        });
+                    }
+
+                    // Body
+                    ctx.fillStyle = G.wrongFlash ? '#ff003c' : '#ff2d7b';
+                    ctx.shadowBlur = 22;
+                    ctx.shadowColor = G.wrongFlash ? '#ff003c' : '#ff6faa';
+                    ctx.fillRect(cubeX, cy, cs, cs);
+                    // Inner highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.fillRect(cubeX + 5, cy + 5, cs - 10, cs - 10);
+                    ctx.shadowBlur = 0;
+
+                    // ── Target text above cube ──
+                    if (G.currentTarget) {
+                        const typed = G.inputBuffer || '';
+                        const remaining = G.currentTarget.slice(typed.length);
+                        const tx = cubeX + cs / 2;
+                        const ty = cy - 18;
+
+                        ctx.font = "bold 34px 'Outfit'";
+                        ctx.textAlign = 'center';
+                        const fullW = ctx.measureText(G.currentTarget).width;
+                        const typedW = ctx.measureText(typed).width;
+                        const startX = tx - fullW / 2;
+
+                        ctx.textAlign = 'left';
+                        if (typed) {
+                            ctx.fillStyle = '#0aff9d';
+                            ctx.shadowBlur = 8; ctx.shadowColor = '#0aff9d';
+                            ctx.fillText(typed, startX, ty);
+                            ctx.shadowBlur = 0;
+                        }
+                        ctx.fillStyle = '#fff';
+                        ctx.fillText(remaining, startX + typedW, ty);
+                        ctx.textAlign = 'center';
+
+                        // Next previews
+                        if (G.queue && G.queue.length > 0) {
+                            ctx.font = "16px 'Outfit'";
+                            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                            ctx.fillText(G.queue.slice(0, 3).join('  ·  '), cubeX + cs + 120, cy + cs / 2);
+                        }
+                    }
+                }
+
+                // ── Phase label ──
+                if (G.phaseLabel) {
+                    ctx.font = "600 12px 'Outfit'";
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                    ctx.fillText('PHASE: ' + G.phaseLabel, 20, H - 10);
+                }
+
+                // ── Particles ──
+                this.particles.forEach(p => {
+                    ctx.globalAlpha = Math.max(0, p.life);
+                    ctx.fillStyle = p.col;
+                    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+                });
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+            }
+        }
+
+        // ─── KEYBOARD DASHBOARD ─────────────────────────────
+        class Dashboard {
+            constructor() {
+                this.els = {};
+                this.missMap = {};
+                this.hits = 0; this.misses = 0; this.maxCombo = 0;
+                this.apmData = [];
+                this._build();
+                this._initGraph();
+            }
+
+            _build() {
+                const rows = ['QWERTZUIOPÜ', 'ASDFGHJKLÖÄ', 'YXCVBNM'];
+                const wrap = document.getElementById('kb');
+                wrap.innerHTML = '';
+                rows.forEach(r => {
+                    const row = document.createElement('div');
+                    row.className = 'kb-row';
+                    r.split('').forEach(ch => {
+                        const k = document.createElement('div');
+                        k.className = 'kb-key'; k.textContent = ch; k.id = 'k-' + ch;
+                        row.appendChild(k);
+                        this.els[ch] = k;
+                    });
+                    wrap.appendChild(row);
+                });
+            }
+
+            target(ch) {
+                document.querySelectorAll('.kb-key.target').forEach(e => e.classList.remove('target'));
+                if (ch && this.els[ch]) this.els[ch].classList.add('target');
+            }
+
+            flash(ch, ok) {
+                const el = this.els[ch]; if (!el) return;
+                el.className = 'kb-key ' + (ok ? 'hit' : 'miss');
+                setTimeout(() => el.className = 'kb-key', 180);
+                if (ok) this.hits++; else { this.misses++; this.missMap[ch] = (this.missMap[ch] || 0) + 1; }
+                this._stats();
+            }
+
+            _stats() {
+                const t = this.hits + this.misses;
+                document.getElementById('st-acc').textContent = t ? Math.round(this.hits / t * 100) + '%' : '–';
+                document.getElementById('st-miss').textContent = this.misses;
+                document.getElementById('st-combo').textContent = this.maxCombo;
+                if (this.apmData.length) {
+                    const avg = Math.round(this.apmData.reduce((a, b) => a + b, 0) / this.apmData.length);
+                    document.getElementById('st-apm').textContent = avg;
+                }
+            }
+
+            heatmap() {
+                Object.entries(this.missMap).forEach(([ch, n]) => {
+                    const el = this.els[ch]; if (!el) return;
+                    el.className = 'kb-key ' + (n > 5 ? 'heat-3' : n > 2 ? 'heat-2' : 'heat-1');
+                });
+            }
+
+            pushAPM(v) { this.apmData.push(v); this._drawGraph(); this._stats(); }
+
+            _initGraph() {
+                this.gc = document.getElementById('apm-graph');
+                this.gx = this.gc.getContext('2d');
+                this.gc.width = this.gc.clientWidth;
+                this.gc.height = this.gc.clientHeight;
+            }
+
+            _drawGraph() {
+                const ctx = this.gx, W = this.gc.width, H = this.gc.height;
+                ctx.clearRect(0, 0, W, H);
+                if (this.apmData.length < 1) return;
+                const max = Math.max(120, ...this.apmData);
+                const step = this.apmData.length > 1 ? W / (this.apmData.length - 1) : W;
+
+                // Grid
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+                ctx.font = '10px Outfit'; ctx.fillStyle = '#555';
+                for (let v = 0; v <= max; v += 30) {
+                    const y = H - (v / max) * H;
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+                    ctx.fillText(v, 2, y - 3);
+                }
+                // Line
+                ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                this.apmData.forEach((v, i) => {
+                    const x = i * step, y = H - (v / max) * H;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                // Dots + labels
+                this.apmData.forEach((v, i) => {
+                    const x = i * step, y = H - (v / max) * H;
+                    ctx.fillStyle = '#00e5ff';
+                    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#aaa'; ctx.font = '9px Outfit'; ctx.textAlign = 'center';
+                    ctx.fillText(v, x, y - 8);
+                });
+                // Avg line
+                const avg = this.apmData.reduce((a, b) => a + b, 0) / this.apmData.length;
+                const ay = H - (avg / max) * H;
+                ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,230,0,0.4)';
+                ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(W, ay); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(255,230,0,0.6)'; ctx.font = '10px Outfit'; ctx.textAlign = 'right';
+                ctx.fillText('Ø ' + Math.round(avg), W - 4, ay - 4);
+            }
+
+            reset() {
+                this.hits = 0; this.misses = 0; this.maxCombo = 0;
+                this.missMap = {}; this.apmData = [];
+                document.querySelectorAll('.kb-key').forEach(k => k.className = 'kb-key');
+                this._stats();
+                this.gx.clearRect(0, 0, this.gc.width, this.gc.height);
+            }
+        }
+
+        // ─── GAME STATE ─────────────────────────────────────
+        const sfx = new SFX();
+        const ren = new Renderer('game');
+        const db = new Dashboard();
+
+        let G = {}; // Game state
+
+        let forcedPhase = null; // null = auto (time-based), 0/1/2 = manual override
+
+        function freshState() {
+            return {
+                on: false,
+                dead: false,
+                t0: 0,
+                elapsed: 0,
+                score: 0,
+                combo: 0,
+                currentTarget: '',
+                inputBuffer: '',
+                queue: [],       // upcoming letters/words
+                phaseLabel: '',
+                cubeY: 0,        // vertical offset from ground (positive = up)
+                cubeVY: 0,       // vertical velocity (px/s)
+                jumping: false,
+                wrongFlash: false,
+                trail: [],
+                obstacles: [],   // {worldX, letter, cleared}
+                cameraX: 0,      // world scroll offset
+                nextBeatWorld: 0, // world-X of next obstacle spawn point
+                lastLetter: 'A',
+                patternBucket: 0,
+                lastAPMCheck: 0,
+                deathFreezeTimer: 0,
+            };
+        }
+
+        // ─── PHASE SWITCHER ─────────────────────────────────
+        function switchPhase(idx) {
+            forcedPhase = idx;
+            // Update button styles
+            document.querySelectorAll('.phase-btn').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.phase) === idx);
+            });
+            // Wipe everything from the old phase so it's a clean switch
+            if (G.on && !G.dead) {
+                G.queue = [];
+                G.obstacles = [];
+                G.currentTarget = '';
+                G.inputBuffer = '';
+                G.nextBeatWorld = G.cameraX + ren.cubeX + 200;
+            }
+        }
+
+        // ─── PHASE LOGIC ────────────────────────────────────
+        const PHASE_DEFS = [
+            { label: 'Einzelne Tasten', restBeats: 1, buckets: ['alternator', 'mirror'], multi: false, gen: 'single' },
+            { label: 'Doppel-Paare', restBeats: 0, buckets: ['alternator', 'mirror', 'roll'], multi: true, gen: 'pair' },
+            { label: 'Wort-Dash', restBeats: 0, buckets: ['roll', 'alternator'], multi: true, gen: 'word' },
+        ];
+
+        function getPhase(elapsed) {
+            if (forcedPhase !== null) return PHASE_DEFS[forcedPhase];
+            if (elapsed < 30) return PHASE_DEFS[0];
+            if (elapsed < 60) return PHASE_DEFS[1];
+            return PHASE_DEFS[2];
+        }
+
+        function generateLetter(phase) {
+            const bName = phase.buckets[Math.floor(Math.random() * phase.buckets.length)];
+            const letter = Bucket[bName](G.lastLetter);
+            G.lastLetter = letter;
+            return letter;
+        }
+
+        function generateTarget(phase) {
+            if (phase.gen === 'single') return generateLetter(phase);
+            if (phase.gen === 'pair') {
+                // Pairs
+                const a = generateLetter(phase);
+                const b = generateLetter(phase);
+                return a + b;
+            } else {
+                // Words (3-5 letters)
+                const wordLen = 3 + Math.floor(Math.random() * 3);
+                let w = '';
+                for (let i = 0; i < wordLen; i++) w += generateLetter(phase);
+                return w;
+            }
+        }
+
+        // ─── OBSTACLE SPAWNING (Beat-Snapped) ───────────────
+        function ensureObstacles() {
+            const phase = getPhase(G.elapsed);
+            G.phaseLabel = phase.label;
+
+            // Spawn obstacles ahead of the camera
+            const lookAheadPx = CFG.LOOKAHEAD_BEATS * CFG.BEAT_PX + ren.W;
+
+            while (G.nextBeatWorld < G.cameraX + lookAheadPx) {
+                // Generate target for this beat
+                const target = generateTarget(phase);
+                G.queue.push(target);
+
+                // Place spike at this beat grid point
+                G.obstacles.push({
+                    worldX: G.nextBeatWorld,
+                    letter: target,
+                    cleared: false
+                });
+
+                // Advance to next beat grid point
+                // In Phase 1: skip one beat (rest)
+                const advance = phase.restBeats ? 2 : 1;
+                G.nextBeatWorld += CFG.BEAT_PX * advance;
+            }
+
+            // Set current target if empty
+            if (!G.currentTarget && G.queue.length > 0) {
+                advanceTarget();
+            }
+        }
+
+        function advanceTarget() {
+            G.currentTarget = G.queue.shift();
+            G.inputBuffer = '';
+            if (G.currentTarget) {
+                db.target(G.currentTarget[0]);
+            }
+        }
+
+        // ─── COLLISION DETECTION ────────────────────────────
+        function checkCollisions() {
+            const cubeLeft = ren.cubeX + CFG.HITBOX_SHRINK;
+            const cubeRight = ren.cubeX + CFG.CUBE_SIZE - CFG.HITBOX_SHRINK;
+            const cubeTop = ren.groundY - CFG.CUBE_SIZE - G.cubeY + CFG.HITBOX_SHRINK;
+            const cubeBottom = ren.groundY - G.cubeY - CFG.HITBOX_SHRINK;
+
+            for (const ob of G.obstacles) {
+                if (ob.cleared) continue;
+
+                const spikeScreenX = ob.worldX - G.cameraX;
+                const sLeft = spikeScreenX + CFG.HITBOX_SHRINK;
+                const sRight = spikeScreenX + CFG.SPIKE_W - CFG.HITBOX_SHRINK;
+                const sTop = ren.groundY - CFG.SPIKE_H + CFG.HITBOX_SHRINK;
+                const sBottom = ren.groundY;
+
+                // AABB overlap
+                if (cubeRight > sLeft && cubeLeft < sRight && cubeBottom > sTop && cubeTop < sBottom) {
+                    die();
+                    return;
+                }
+            }
+        }
+
+        // ─── DEATH ──────────────────────────────────────────
+        function die() {
+            G.dead = true;
+            G.deathFreezeTimer = 0.06; // 1-frame freeze
+
+            // Shatter particles
+            const cx = ren.cubeX + CFG.CUBE_SIZE / 2;
+            const cy = ren.groundY - CFG.CUBE_SIZE - G.cubeY + CFG.CUBE_SIZE / 2;
+            ren.burst(cx, cy, '#ff2d7b', CFG.DEATH_PARTICLES);
+            ren.burst(cx, cy, '#ff6faa', 15);
+            ren.shake = 18;
+
+            sfx.crash();
+        }
+
+        // ─── INPUT HANDLER ──────────────────────────────────
+        function onKey(key) {
+            if (!G.on || G.dead) return;
+
+            const needed = G.currentTarget ? G.currentTarget[G.inputBuffer.length] : null;
+            if (!needed) return;
+
+            sfx.click();
+
+            if (key === needed) {
+                // ── Correct ──
+                G.inputBuffer += key;
+                db.flash(key, true);
+
+                // Jump impulse
+                if (!G.jumping) {
+                    G.jumping = true;
+                    G.cubeVY = -CFG.JUMP_VEL; // positive = upward in our coord system
+                }
+
+                ren.burst(ren.cubeX + CFG.CUBE_SIZE / 2, ren.groundY - CFG.CUBE_SIZE - G.cubeY, '#0aff9d', 8);
+
+                // Target complete?
+                if (G.inputBuffer === G.currentTarget) {
+                    G.combo++;
+                    G.score += 10 + G.combo * 3 + G.currentTarget.length * 5;
+                    if (G.combo > db.maxCombo) db.maxCombo = G.combo;
+                    sfx.ping(G.combo);
+                    showCombo(G.combo);
+
+                    // Mark the nearest uncleared obstacle as cleared
+                    for (const ob of G.obstacles) {
+                        if (!ob.cleared && ob.letter === G.currentTarget) {
+                            ob.cleared = true;
+                            break;
+                        }
+                    }
+
+                    ren.burst(ren.cubeX + 20, ren.groundY - CFG.CUBE_SIZE - G.cubeY - 10, '#ffe600', 14);
+                    advanceTarget();
+                } else {
+                    // Update keyboard target to next char
+                    const nextChar = G.currentTarget[G.inputBuffer.length];
+                    if (nextChar) db.target(nextChar);
+                }
+            } else {
+                // ── Wrong ──
+                db.flash(key, false);
+                sfx.error();
+                ren.shake = 12;
+                G.wrongFlash = true;
+                setTimeout(() => G.wrongFlash = false, 100);
+                G.combo = 0;
+                G.inputBuffer = ''; // Reset word progress
+                if (G.currentTarget) db.target(G.currentTarget[0]);
+            }
+
+            document.getElementById('h-score').textContent = G.score;
+            document.getElementById('h-combo').textContent = G.combo;
+        }
+
+        function showCombo(n) {
+            if (n < 2) return;
+            const el = document.getElementById('combo-pop');
+            el.textContent = '× ' + n;
+            el.style.opacity = '1';
+            el.style.transform = 'translate(-50%,-50%) scale(1.3)';
+            setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translate(-50%,-50%) scale(1)'; }, 400);
+        }
+
+        // ─── MAIN LOOP ──────────────────────────────────────
+        let lastT = 0;
+
+        function loop(ts) {
+            if (!G.on) return;
+
+            const rawDt = (ts - lastT) / 1000;
+            const dt = Math.min(rawDt, 0.033); // Cap at ~30fps minimum
+            lastT = ts;
+
+            // ── Death freeze ──
+            if (G.deathFreezeTimer > 0) {
+                G.deathFreezeTimer -= dt;
+                if (G.deathFreezeTimer <= 0 && G.dead) {
+                    // After freeze, let particles fly then end
+                    G.deathAnimTimer = 1.2; // 1.2s of death animation
+                }
+                ren.updateParticles(dt);
+                ren.draw(G, G.elapsed);
+                requestAnimationFrame(loop);
+                return;
+            }
+
+            // ── Death animation (particles flying) ──
+            if (G.dead) {
+                G.deathAnimTimer -= dt;
+                ren.updateParticles(dt);
+                ren.draw(G, G.elapsed);
+                if (G.deathAnimTimer <= 0) {
+                    endGame(false);
+                    return;
+                }
+                requestAnimationFrame(loop);
+                return;
+            }
+
+            // ── Elapsed time ──
+            G.elapsed = (Date.now() - G.t0) / 1000;
+            const timeLeft = Math.max(0, CFG.TOTAL_TIME - G.elapsed);
+            document.getElementById('h-time').textContent = Math.ceil(timeLeft);
+            document.getElementById('progress-bar').style.width = ((G.elapsed / CFG.TOTAL_TIME) * 100) + '%';
+
+            // ── Scroll world ──
+            G.cameraX += CFG.SCROLL_PX_S * dt;
+            ren.groundScroll = G.cameraX % 60;
+
+            // ── Jump physics ──
+            if (G.cubeY > 0 || G.jumping) {
+                G.cubeY += G.cubeVY * dt;
+                G.cubeVY -= CFG.GRAVITY * dt;
+                // Ground clamping
+                if (G.cubeY <= 0) {
+                    G.cubeY = 0;
+                    G.cubeVY = 0;
+                    G.jumping = false;
+                }
+            }
+
+            // ── Trail ──
+            const trailY = ren.groundY - CFG.CUBE_SIZE - G.cubeY;
+            G.trail.push({ x: ren.cubeX, y: trailY });
+            if (G.trail.length > 8) G.trail.shift();
+
+            // ── Generate obstacles ──
+            ensureObstacles();
+
+            // ── Cull passed obstacles ──
+            G.obstacles = G.obstacles.filter(ob => ob.worldX - G.cameraX > -100);
+
+            // ── Collision ──
+            checkCollisions();
+
+            // ── Audio beat ──
+            sfx.scheduleBeat();
+
+            // ── APM tracking every 5s ──
+            if (G.elapsed - G.lastAPMCheck >= 5 && G.elapsed > 1) {
+                const apm = Math.round(db.hits / (G.elapsed / 60));
+                db.pushAPM(apm);
+                G.lastAPMCheck = G.elapsed;
+            }
+
+            // ── Draw ──
+            ren.updateParticles(dt);
+            ren.draw(G, G.elapsed);
+
+            // ── Time up ──
+            if (timeLeft <= 0) {
+                endGame(true);
+            } else {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        // ─── CONTROL ────────────────────────────────────────
+        function startGame() {
+            sfx.resume();
+            document.getElementById('ov-start').classList.add('hidden');
+            document.getElementById('ov-end').classList.add('hidden');
+
+            G = freshState();
+            G.on = true;
+            G.t0 = Date.now();
+            G.nextBeatWorld = ren.cubeX + ren.W * 0.5; // First obstacle starts ahead
+            db.reset();
+            sfx.resetBeat();
+
+            document.getElementById('h-score').textContent = '0';
+            document.getElementById('h-combo').textContent = '0';
+
+            lastT = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function endGame(success) {
+            G.on = false;
+            const ov = document.getElementById('ov-end');
+            ov.classList.remove('hidden');
+            document.getElementById('end-title').textContent = success ? 'Level Complete!' : 'Game Over';
+            document.getElementById('end-title').style.background = success
+                ? 'linear-gradient(135deg,#0aff9d,#00e5ff)'
+                : 'linear-gradient(135deg,#ff003c,#ff6faa)';
+            document.getElementById('end-title').style.webkitBackgroundClip = 'text';
+            document.getElementById('end-title').style.webkitTextFillColor = 'transparent';
+            document.getElementById('end-score').textContent = G.score;
+            db.heatmap();
+            db._stats();
+        }
+
+        // ─── EVENT LISTENERS ────────────────────────────────
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-again').addEventListener('click', startGame);
+
+        window.addEventListener('keydown', e => {
+            const k = e.key.toUpperCase();
+            if (k.length === 1 && /[A-ZÖÄÜ]/.test(k)) {
+                e.preventDefault();
+                onKey(k);
+            }
+        });
+
+        // ─── IDLE ANIMATION (Menu screen) ───────────────────
+        (function idle() {
+            if (!G.on) {
+                const t = Date.now() * 0.001;
+                ren.updateParticles(0.016);
+                ren.draw({
+                    obstacles: [], dead: false, cubeY: 0,
+                    cubeVY: 0, trail: [], wrongFlash: false,
+                    currentTarget: '', inputBuffer: '', queue: [], phaseLabel: ''
+                }, t);
+            }
+            requestAnimationFrame(idle);
+        })();
+    </script>
+</body>
+
+</html>
