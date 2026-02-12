@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typo-Dash | Gamification Hub</title>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+      * { font-family: 'Inter', sans-serif; }
+      
+      /* Antigravity Expand Mechanism */
+      .app-expand-container {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+      }
+      .app-expand-container.active { grid-template-rows: 1fr; margin-top: 1.5rem; }
+      .app-content { min-height: 0; }
+      .app-viewport {
+        width: 100%;
+        height: 650px;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        background: #000;
+      }
+      .glitch-border { border-color: #22c55e; box-shadow: 0 0 30px rgba(34, 197, 94, 0.15); }
+      .dash-border { border-color: #f59e0b; box-shadow: 0 0 30px rgba(245, 158, 11, 0.15); }
+    </style>
+
+    <script>
+      const Antigravity = {
+        toggle: function(url, containerId, themeClass) {
+          const container = document.getElementById(containerId);
+          const viewport = container.querySelector('iframe');
+          
+          // Wenn das gleiche Spiel nochmals geklickt wird -> Schließen
+          if (viewport.getAttribute('data-current-url') === url && container.classList.contains('active')) {
+            container.classList.remove('active');
+            setTimeout(() => { viewport.src = "about:blank"; viewport.setAttribute('data-current-url', ''); }, 600);
+          } else {
+            // Neues Spiel laden
+            viewport.src = url;
+            viewport.setAttribute('data-current-url', url);
+            viewport.className = `app-viewport ${themeClass}`;
+            container.classList.add('active');
+            // Sanftes Scrollen zum Spiel
+            setTimeout(() => {
+              container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+          }
+        }
+      };
+    </script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+
+    <div class="max-w-5xl mx-auto space-y-8">
+        
+        <div class="bg-gray-900 rounded-2xl p-8 text-white border-2 border-green-500">
+            <h3 class="text-xl font-bold mb-4 text-green-400">Concept 1: The Glitch</h3>
+            <button onclick="Antigravity.toggle('apps/Hackerman.html', 'portal-glitch', 'glitch-border')" 
+                    class="bg-green-500 text-black px-6 py-2 rounded-lg font-bold hover:bg-green-400 transition-all">
+                Hacker Terminal öffnen
+            </button>
+            <div id="portal-glitch" class="app-expand-container">
+                <div class="app-content">
+                    <iframe class="app-viewport" src="about:blank"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-8 text-white border-2 border-yellow-400">
+            <h3 class="text-xl font-bold mb-4">Concept 4: Typo-Dash Hub</h3>
+            <div class="flex flex-wrap gap-4">
+                <button onclick="Antigravity.toggle('apps/Typo-Dash.html', 'portal-dash', 'dash-border')" 
+                        class="bg-white text-orange-600 px-6 py-2 rounded-lg font-bold hover:bg-gray-100 transition-all">
+                    Typo-Dash Main
+                </button>
+                <button onclick="Antigravity.toggle('apps/Matrix-Mode.html', 'portal-dash', 'dash-border')" 
+                        class="bg-white text-orange-600 px-6 py-2 rounded-lg font-bold hover:bg-gray-100 transition-all">
+                    Matrix Mode
+                </button>
+            </div>
+
+            <div id="portal-dash" class="app-expand-container">
+                <div class="app-content">
+                    <iframe class="app-viewport" src="about:blank"></iframe>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
