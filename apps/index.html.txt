@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typo-Dash | Level 1: Alpha-Block</title>
+    <style>
+        /* --- VISUALS & NEON STYLE --- */
+        :root {
+            --neon-green: #39ff14;
+            --neon-red: #ff073a;
+            --neon-blue: #00f3ff;
+            --neon-yellow: #fff01f;
+            --bg-dark: #050510;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 3D Grid Pipeline Effect */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            background: linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(5,5,16,1) 100%);
+            overflow: hidden;
+            border-bottom: 2px solid var(--neon-blue);
+            perspective: 800px;
+        }
+
+        .grid-floor {
+            position: absolute;
+            bottom: -50%;
+            left: -50%;
+            width: 200%;
+            height: 100%;
+            background-image: 
+                linear-gradient(var(--neon-blue) 1px, transparent 1px),
+                linear-gradient(90deg, var(--neon-blue) 1px, transparent 1px);
+            background-size: 50px 50px;
+            background-position: 0 0;
+            transform: rotateX(60deg);
+            opacity: 0.3;
+            animation: gridMove 1s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: rotateX(60deg) translateY(0); }
+            100% { transform: rotateX(60deg) translateY(50px); }
+        }
+
+        /* Player Avatar (Cube) */
+        #player {
+            position: absolute;
+            left: 20%;
+            bottom: 25%; /* Sitting on the perceived floor */
+            width: 50px;
+            height: 50px;
+            background-color: var(--bg-dark);
+            border: 2px solid var(--neon-green);
+            box-shadow: 0 0 15px var(--neon-green);
+            transition: transform 0.1s, bottom 0.2s;
+            z-index: 10;
+        }
+        
+        .jump { animation: jumpAnim 0.4s ease-out; }
+        @keyframes jumpAnim {
+            0% { bottom: 25%; transform: rotate(0deg); }
+            50% { bottom: 50%; transform: rotate(90deg); }
+            100% { bottom: 25%; transform: rotate(180deg); }
+        }
+
+        /* Target/Enemy */
+        .target {
+            position: absolute;
+            bottom: 25%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--bg-dark);
+            background-color: var(--neon-red);
+            box-shadow: 0 0 15px var(--neon-red);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%); /* Spike shape */
+            z-index: 5;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        #progress-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: #333;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+            transition: width 0.2s linear;
+        }
+
+        /* --- VISUAL KEYBOARD (REMOTE MONITORING) --- */
+        #keyboard-area {
+            height: 40vh;
+            width: 100%;
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #333;
+        }
+
+        .keyboard-base {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            padding: 20px;
+            background: #222;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .key {
+            width: 50px;
+            height: 50px;
+            background: #444;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+
+        .key.active-target { border: 2px solid var(--neon-green); color: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+        .key.pressed-correct { background: var(--neon-yellow); color: black; transform: scale(0.95); box-shadow: 0 0 15px var(--neon-yellow); }
+        .key.pressed-wrong { background: var(--neon-red); transform: scale(1.1); box-shadow: 0 0 15px var(--neon-red); }
+
+        /* Overlays */
+        #start-screen, #game-over-screen, #win-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .hidden { display: none !important; }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            background: transparent;
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+        button:hover { background: var(--neon-green); color: black; }
+
+        h1 { font-size: 3rem; text-shadow: 0 0 10px var(--neon-blue); margin-bottom: 0.5rem; }
+        p { margin-bottom: 2rem; color: #ccc; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="progress-container"><div id="progress-bar"></div></div>
+        <div class="grid-floor"></div>
+        
+        <div id="hud">
+            <div>COMBO: <span id="combo-display" style="color:var(--neon-yellow)">0</span></div>
+            <div>SCORE: <span id="score-display">0</span></div>
+        </div>
+
+        <div id="player"></div>
+        <div id="targets-layer"></div>
+
+        <div id="start-screen">
+            <h1>TYPO-DASH</h1>
+            <p>Level 1: Alpha-Block [ASDF JKLÖ]</p>
+            <p style="font-size: 0.8rem">⚠️ Sound wird aktiviert</p>
+            <button onclick="startGame()">INITIALIZE</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1 style="color: var(--neon-red)">SYSTEM FAILURE</h1>
+            <p>Connection Lost.</p>
+            <button onclick="location.reload()">REBOOT</button>
+        </div>
+
+        <div id="win-screen" class="hidden">
+            <h1 style="color: var(--neon-green)">SYSTEM SECURED</h1>
+            <p>Level Alpha Complete.</p>
+            <p id="final-score"></p>
+            <button onclick="location.reload()">NEXT LEVEL</button>
+        </div>
+    </div>
+
+    <div id="keyboard-area">
+        <div class="keyboard-base">
+            <div class="key" id="key-a">A</div>
+            <div class="key" id="key-s">S</div>
+            <div class="key" id="key-d">D</div>
+            <div class="key" id="key-f">F</div>
+            <div class="key" style="opacity:0.3">G</div>
+            <div class="key" style="opacity:0.3">H</div>
+            <div class="key" id="key-j">J</div>
+            <div class="key" id="key-k">K</div>
+            <div class="key" id="key-l">L</div>
+            <div class="key" id="key-ö">Ö</div>
+        </div>
+    </div>
+
+    <script>
+        /* --- GAME CONFIGURATION --- */
+        const BPM = 100;
+        const BEAT_MS = 60000 / BPM; 
+        const GAME_SPEED_PX = 5; // Pixel per frame movement
+
+        // Level Data (Phase 1, 2, 3 mix)
+        // distance: Abstand zum VORGÄNGER in "Beats"
+        const levelData = [
+            { char: 'a', distance: 4 }, { char: 's', distance: 2 }, { char: 'd', distance: 2 }, { char: 'f', distance: 2 },
+            { char: 'j', distance: 4 }, { char: 'k', distance: 2 }, { char: 'l', distance: 2 }, { char: 'ö', distance: 2 },
+            // Phase 2: Pairs
+            { char: 'a', distance: 4 }, { char: 's', distance: 1 }, 
+            { char: 'd', distance: 4 }, { char: 'f', distance: 1 },
+            { char: 'j', distance: 4 }, { char: 'k', distance: 1 },
+            // Phase 3: Short Burst "FASADE"
+            { char: 'f', distance: 4 }, { char: 'a', distance: 1 }, { char: 's', distance: 1 }, { char: 'a', distance: 1 }, { char: 'd', distance: 1 }, { char: 'e', distance: 1 },
+            // Finish line marker
+            { char: 'END', distance: 8 }
+        ];
+
+        /* --- STATE VARIABLES --- */
+        let isPlaying = false;
+        let score = 0;
+        let combo = 0;
+        let activeTargets = [];
+        let nextTargetIndex = 0;
+        let lastSpawnTime = 0;
+        let gameStartTime = 0;
+        let animationFrameId;
+
+        /* --- AUDIO SYSTEM (Web Audio API) --- */
+        let audioCtx;
+        
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                // Mechanical Click
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'ping') {
+                // Success Ping
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200 + (combo * 50), now); // Pitch goes up with combo
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'error') {
+                // Error Buzzer
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'bgm') {
+                // Simple Kick Drum beat simulation
+                // In a real game, use a looped sample. Here we simulate a metronome.
+                // Not implemented to keep code simple, relying on SFX for rhythm.
+            }
+        }
+
+        /* --- GAME ENGINE --- */
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            isPlaying = true;
+            gameStartTime = Date.now();
+            lastSpawnTime = gameStartTime;
+            spawnNextTarget(); // Start chain
+            gameLoop();
+            
+            // Background Music Simulation (Metronome)
+            setInterval(() => {
+                if(isPlaying) {
+                    // Slight beat sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.value = 100;
+                    gain.gain.value = 0.05;
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                }
+            }, BEAT_MS);
+        }
+
+        function spawnNextTarget() {
+            if (nextTargetIndex >= levelData.length) return;
+
+            const data = levelData[nextTargetIndex];
+            
+            if (data.char === 'END') {
+                // Just a marker to end game later
+                return; 
+            }
+
+            const el = document.createElement('div');
+            el.classList.add('target');
+            el.innerText = data.char.toUpperCase();
+            // Start position off screen right
+            el.style.left = '1000px'; 
+            
+            // Add to logic
+            const targetObj = {
+                el: el,
+                char: data.char,
+                x: 1200, // Virtual X coordinate
+                solved: false
+            };
+            
+            document.getElementById('targets-layer').appendChild(el);
+            activeTargets.push(targetObj);
+
+            // Schedule next spawn
+            const timeToNext = data.distance * BEAT_MS; 
+            
+            nextTargetIndex++;
+            if (nextTargetIndex < levelData.length) {
+                 // Calculate distance based on pixels for smoother rendering in this simple engine
+                 // Instead of time-based timeout (which can drift), we spawn based on X distance in loop?
+                 // For simplicity in this prototype, we just spawn them far apart.
+                 setTimeout(spawnNextTarget, levelData[nextTargetIndex].distance * (60000/BPM));
+            }
+            
+            // Highlight next key on keyboard
+            highlightNextKey(targetObj.char);
+        }
+
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            const playerX = 200; // Fixed visual position of player roughly
+
+            // Update Progress
+            const progress = (nextTargetIndex / levelData.length) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+
+            // Move Targets
+            for (let i = 0; i < activeTargets.length; i++) {
+                let t = activeTargets[i];
+                t.x -= GAME_SPEED_PX;
+                t.el.style.left = t.x + 'px';
+
+                // Hit detection zone
+                if (t.x < playerX + 50 && t.x > playerX - 50) {
+                    // In Zone
+                    t.el.style.backgroundColor = "var(--neon-yellow)"; // Ready to hit
+                } else if (t.x < playerX - 60) {
+                    // Missed!
+                    if (!t.solved) {
+                        gameOver();
+                        return;
+                    }
+                }
+            }
+
+            // Cleanup solved targets
+            activeTargets = activeTargets.filter(t => t.x > -100);
+            
+            // Win Condition
+            if (nextTargetIndex === levelData.length && activeTargets.length === 0) {
+                winGame();
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        /* --- INPUT HANDLING --- */
+        document.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+
+            const key = e.key.toLowerCase();
+            const playerX = 200;
+            
+            // Visual Keyboard Feedback
+            const keyEl = document.getElementById('key-' + key);
+            
+            // Find the closest target
+            // We only care about the FIRST element in the array that hasn't been solved
+            const target = activeTargets[0];
+
+            if (target && !target.solved) {
+                // Check if target is in hit window
+                if (target.x < playerX + 100 && target.x > playerX - 100) {
+                    
+                    if (key === target.char) {
+                        // SUCCESS
+                        target.solved = true;
+                        target.el.style.display = 'none'; // Hide spike
+                        
+                        score += 100 + (combo * 10);
+                        combo++;
+                        updateHUD();
+                        
+                        playSound('click');
+                        playSound('ping');
+                        triggerJump();
+                        
+                        if (keyEl) {
+                            keyEl.classList.add('pressed-correct');
+                            setTimeout(() => keyEl.classList.remove('pressed-correct'), 200);
+                        }
+
+                    } else {
+                        // WRONG KEY
+                        combo = 0;
+                        updateHUD();
+                        playSound('error');
+                        if (keyEl) {
+                            keyEl.classList.add('pressed-wrong');
+                            setTimeout(() => keyEl.classList.remove('pressed-wrong'), 200);
+                        }
+                        // Optional: Hardcore mode = Instant Death on wrong key
+                        // gameOver(); 
+                    }
+                }
+            }
+        });
+
+        function triggerJump() {
+            const p = document.getElementById('player');
+            p.classList.remove('jump');
+            void p.offsetWidth; // Trigger reflow
+            p.classList.add('jump');
+        }
+
+        function highlightNextKey(char) {
+            // Reset all highlights
+            document.querySelectorAll('.key').forEach(k => k.classList.remove('active-target'));
+            const k = document.getElementById('key-' + char);
+            if (k) k.classList.add('active-target');
+        }
+
+        function updateHUD() {
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('combo-display').innerText = combo;
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(animationFrameId);
+            playSound('error');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function winGame() {
+            isPlaying = false;
+            cancelAnimationFrame(animationFrameId);
+            document.getElementById('final-score').innerText = "Score: " + score;
+            document.getElementById('win-screen').classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
